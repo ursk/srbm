@@ -1,0 +1,98 @@
+% this code implements minimum probability flow learning for a fully connected Ising model.  see http://arxiv.org/abs/0906.4779
+
+% Author: Jascha Sohl-Dickstein (2009)
+% Web: http://redwood.berkeley.edu/wiki/Jascha_Sohl-Dickstein
+% This software is made available under the Creative Commons
+% Attribution-Noncommercial License.
+% (http://creativecommons.org/licenses/by-nc/3.0/)
+
+addpath('../3rd_party_code/minFunc/') 
+
+description = 'd=20, 10000 samples'
+
+% initialize
+obfun = 'K_dK_ising';
+d = 9; % number of units
+nsamples = 10000; % number of training samples
+maxlinesearch = 1000; % this number is excessive just to be safe!!!!!! learning works fine if this is just a few hundred
+independent_steps = 10*d; % the number of gibbs sampling steps to take between samples
+burnin = 100*d;
+
+minf_options = [];
+%options.display = 'none';
+minf_options.maxFunEvals = maxlinesearch;
+minf_options.maxIter = maxlinesearch;
+
+
+%Xall = sample_ising( J, nsamples, burnin, independent_steps );
+load('scribble.mat')
+Xall = im2col(im, [3 3], 'distinct');
+foo=randperm(29241);
+Xall = Xall(:, foo(1:10000));
+
+
+
+% randomly initialize the parameter matrix we're going to try to learn
+% note that the bias units lie on the diagonal of J
+Jnew = randn( d, d ) / sqrt(d) / 100;
+Jnew = Jnew + Jnew';
+Jnew = Jnew/2;
+
+% perform parameter estimation
+fprintf( '\nRunning minFunc for up to %d learning steps...\n', maxlinesearch );
+t_min = tic();
+Jnew = minFunc( @K_dK_ising, Jnew(:), minf_options, Xall );
+Jnew = reshape(Jnew, d,d);
+t_min = toc(t_min);
+fprintf( 'parameter estimation in %f seconds \n', t_min );
+
+fprintf( '\nGenerating samples using learned parameters for comparison...\n' );
+tic
+Xnew = sample_ising( Jnew, nsamples, burnin, independent_steps );
+fprintf( 'sample generation with learned parameters in %f seconds \n', toc );
+
+% generate correlation matrices for the original and recovered coupling matrices
+mns = mean( Xall, 2 );
+Xt = Xall - mns(:, ones(1,nsamples));
+sds = sqrt(mean( Xt.^2, 2 ));
+Xt = Xt./sds(:, ones(1,nsamples));
+Corr = Xt*Xt'/nsamples;
+mns = mean( Xnew, 2 );
+Xt = Xnew - mns(:, ones(1,nsamples));
+sds = sqrt(mean( Xt.^2, 2 ));
+Xt = Xt./sds(:, ones(1,nsamples));
+Corrnew = Xt*Xt'/nsamples;
+
+Corrdiff = Corr - Corrnew;
+
+
+% show the original, recovered and differences in coupling matrices
+figure();
+subplot(2,3,1);
+subplot(2,3,2);
+imagesc( Jnew, [jmn, jmx] );axis image;colorbar;title( '{J}_{new}' );
+subplot(2,3,3);axis image;colorbar;title( '{J}_{ } - {J}_{new}' );
+
+% show the original, recovered and differences in correlation matrices
+subplot(2,3,4);
+imagesc( Corr);
+axis image;
+colorbar;
+title( '{C}_{ }' );    
+subplot(2,3,5);
+imagesc( Corrnew );
+axis image;
+colorbar;
+title( '{C}_{new}' );    
+subplot(2,3,6);
+imagesc( Corrdiff);
+axis image;
+colorbar;
+title( '{C}_{ } - {C}_{new}' );    
+
+figure();
+plot( Corr(:), Corrnew(:), '.' );
+axis image;
+xlabel( '{C}_{ }' );
+ylabel( '{C}_{new}' );
+title( 'scatter plot of correlations for original and recovered parameters' );
