@@ -3,7 +3,12 @@
 
 function bits = cell_estim()
     ticall=tic();
- 
+    
+    addpath('MPF_ising')
+    addpath('MPF_RBM')
+    addpath('MPF_sRBM')
+    addpath(genpath('3rd_party_code/minFunc/minFunc'))
+
     % --------------------------
     % set model parameters
     % --------------------------
@@ -13,7 +18,7 @@ function bits = cell_estim()
     seed = 42;
     timesteps=1;
         
-    SPEEDUP=10; % if >1, train a smaller model (faster, less accurate) for debugging
+    SPEEDUP=5; % if >1, train a smaller model (faster, less accurate) for debugging
     dataseed = seed; % randomize everything again. 
     PMPF_for_RBM = 0 % new implementation Jascha made -- we don't really want this anymore. 
     
@@ -50,11 +55,7 @@ function bits = cell_estim()
     % --------------------------
     % for demonstration, create a random data set with higher order dependencies.
     rand('seed',dataseed), randn('seed',dataseed) % one fixed dataset, randomize only parameters and AIS
-    XY = rand(p.d, 2*p.T); 
-    XY(1:10,:) = XY(1:10,:).^.5;
-    XY(15:21,:) = XY(15:21,:).^.5;
-    XY(5:16,:) = XY(5:16,:).^.5;
-    XY = XY>.9; 
+    load('demodata.mat', 'XY')
     rand('seed',seed), randn('seed',seed) % different seed for AIS and parametres
     X = XY(:,1:p.T); % training
     Y = XY(:,p.T+1:2*p.T); % validation
@@ -225,7 +226,7 @@ function bits = cell_estim()
             line([0 20], [log2(Z_emp_gibbs) log2(Z_emp_gibbs)])    
             xlim([0.5 18.5]), ylim([log2(Z_emp_gibbs)-.1 log2(Z_emp_gibbs)+.1])
         end
-        saveas(gcf, ['models/exactZ/exactZcomparison-', modelname], 'pdf')   
+        saveas(gcf, ['./exactZ/exactZcomparison-', modelname], 'pdf')   
     else
     end
     
@@ -234,7 +235,7 @@ function bits = cell_estim()
     % save results 
     clear p_mo pat_down X XY Xall Xb Xbin Xsub Y patterns % delete large variables
     fprintf('Writing output to %s \n', modelname);
-    save(['models/', modelname, '.mat']) 
+    save(['./', modelname, '.mat']) 
     fprintf('Total runtim was %d minutes \n', round(toc(ticall)/60))
 return
 
